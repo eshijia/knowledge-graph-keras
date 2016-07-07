@@ -11,7 +11,7 @@ from scipy.stats import rankdata
 from keras_models import *
 
 random.seed(42)
-os.environ['WORDNET'] = '../data/wordnet'
+os.environ['WORDNET'] = 'data/wordnet'
 
 
 class Evaluator:
@@ -252,13 +252,13 @@ if __name__ == '__main__':
         'relation_len': 1,
         'object_len': 1,
         'n_words': 40962, # len(vocabulary) + 1
-        'margin': 0.5,
+        'margin': 0.05,
 
         'training_params': {
-            'save_every': 1,
+            'save_every': 100,
             # 'eval_every': 1,
             'batch_size': 128,
-            'nb_epoch': 200,
+            'nb_epoch': 500,
             'validation_split': 0,
             'optimizer': 'adam',
             # 'optimizer': Adam(clip_norm=0.1),
@@ -285,7 +285,7 @@ if __name__ == '__main__':
         },
 
         'similarity_params': {
-            'mode': 'gesd',
+            'mode': 'cosine',
             'gamma': 1,
             'c': 1,
             'd': 2,

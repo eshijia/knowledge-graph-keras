@@ -121,7 +121,7 @@ class LanguageModel:
                      output_shape=lambda x: x[0])
 
         self.training_model = Model(input=[self.question, self.answer_good, self.answer_bad], output=loss)
-        self.training_model.compile(loss=lambda y_true, y_pred: y_pred, optimizer=optimizer, **kwargs)
+        self.training_model.compile(loss=lambda y_true, y_pred: y_pred + y_true - y_true, optimizer=optimizer, **kwargs)
 
         self.prediction_model = Model(input=[self.question, self.answer_good], output=good_output)
         self.prediction_model.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
