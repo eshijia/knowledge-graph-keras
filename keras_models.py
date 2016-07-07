@@ -16,7 +16,7 @@ from attention_lstm import AttentionLSTM
 class LanguageModel:
     def __init__(self, config):
         self.subject = Input(shape=(config['subject_len'],), dtype='int32', name='subject_base')
-        self.predict = Input(shape=(config['predict_len'],), dtype='int32', name='predict_base')
+        self.predict = Input(shape=(config['relation_len'],), dtype='int32', name='predict_base')
         self.object_good = Input(shape=(config['object_len'],), dtype='int32', name='object_good_base')
         self.object_bad = Input(shape=(config['object_len'],), dtype='int32', name='object_bad_base')
 
