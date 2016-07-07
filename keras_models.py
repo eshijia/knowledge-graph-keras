@@ -15,9 +15,10 @@ from attention_lstm import AttentionLSTM
 
 class LanguageModel:
     def __init__(self, config):
-        self.question = Input(shape=(config['question_len'],), dtype='int32', name='question_base')
-        self.answer_good = Input(shape=(config['answer_len'],), dtype='int32', name='answer_good_base')
-        self.answer_bad = Input(shape=(config['answer_len'],), dtype='int32', name='answer_bad_base')
+        self.subject = Input(shape=(config['subject_len'],), dtype='int32', name='subject_base')
+        self.predict = Input(shape=(config['predict_len'],), dtype='int32', name='predict_base')
+        self.object_good = Input(shape=(config['object_len'],), dtype='int32', name='object_good_base')
+        self.object_bad = Input(shape=(config['object_len'],), dtype='int32', name='object_bad_base')
 
         self.config = config
         self.model_params = config.get('model_params', dict())
@@ -26,16 +27,16 @@ class LanguageModel:
         # initialize a bunch of variables that will be set later
         self._models = None
         self._similarities = None
-        self._answer = None
+        self._object = None
         self._qa_model = None
 
         self.training_model = None
         self.prediction_model = None
 
-    def get_answer(self):
-        if self._answer is None:
-            self._answer = Input(shape=(self.config['answer_len'],), dtype='int32', name='answer')
-        return self._answer
+    def get_object(self):
+        if self._object is None:
+            self._object = Input(shape=(self.config['object_len'],), dtype='int32', name='object')
+        return self._object
 
     @abstractmethod
     def build(self):
@@ -101,29 +102,31 @@ class LanguageModel:
             self._models = self.build()
 
         if self._qa_model is None:
-            question_output, answer_output = self._models
+            subject_output, predict_output, object_output = self._models
+
+            sp_output = merge([subject_output, predict_output], mode='sum')
 
             similarity = self.get_similarity()
-            qa_model = merge([question_output, answer_output], mode=similarity, output_shape=lambda x: x[:-1])
+            qa_model = merge([sp_output, object_output], mode=similarity, output_shape=lambda x: x[:-1])
 
-            self._qa_model = Model(input=[self.question, self.get_answer()], output=[qa_model])
+            self._qa_model = Model(input=[self.subject, self.predict, self.get_object()], output=[qa_model])
 
         return self._qa_model
 
     def compile(self, optimizer, **kwargs):
         qa_model = self.get_qa_model()
 
-        good_output = qa_model([self.question, self.answer_good])
-        bad_output = qa_model([self.question, self.answer_bad])
+        good_output = qa_model([self.subject, self.predict, self.object_good])
+        bad_output = qa_model([self.subject, self.predict, self.object_bad])
 
         loss = merge([good_output, bad_output],
                      mode=lambda x: K.maximum(1e-6, self.config['margin'] - x[0] + x[1]),
                      output_shape=lambda x: x[0])
 
-        self.training_model = Model(input=[self.question, self.answer_good, self.answer_bad], output=loss)
+        self.training_model = Model(input=[self.subject, self.predict, self.object_good, self.object_bad], output=loss)
         self.training_model.compile(loss=lambda y_true, y_pred: y_pred + y_true - y_true, optimizer=optimizer, **kwargs)
 
-        self.prediction_model = Model(input=[self.question, self.answer_good], output=good_output)
+        self.prediction_model = Model(input=[self.subject, self.predict, self.object_good], output=good_output)
         self.prediction_model.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
 
     def fit(self, x, **kwargs):
@@ -145,8 +148,9 @@ class LanguageModel:
 
 class EmbeddingModel(LanguageModel):
     def build(self):
-        question = self.question
-        answer = self.get_answer()
+        subject = self.subject
+        predict = self.predict
+        object_ = self.get_object()
 
         # add embedding layers
         weights = self.model_params.get('initial_embed_weights', None)
@@ -155,26 +159,32 @@ class EmbeddingModel(LanguageModel):
                               output_dim=self.model_params.get('n_embed_dims', 100),
                               weights=weights,
                               mask_zero=True)
-        question_embedding = embedding(question)
-        answer_embedding = embedding(answer)
+        subject_embedding = embedding(subject)
+        predict_embedding = embedding(predict)
+        object_embedding = embedding(object_)
 
         # dropout
         dropout = Dropout(0.5)
-        question_dropout = dropout(question_embedding)
-        answer_dropout = dropout(answer_embedding)
+        subject_dropout = dropout(subject_embedding)
+        predict_dropout = dropout(predict_embedding)
+        object_dropout = dropout(object_embedding)
 
         # maxpooling
         maxpool = Lambda(lambda x: K.max(x, axis=1, keepdims=False), output_shape=lambda x: (x[0], x[2]))
-        question_maxpool = maxpool(question_dropout)
-        answer_maxpool = maxpool(answer_dropout)
+        subject_maxpool = maxpool(subject_dropout)
+        predict_maxpool = maxpool(predict_dropout)
+        object_maxpool = maxpool(object_dropout)
 
         # activation
         activation = Activation('tanh')
-        question_output = activation(question_maxpool)
-        answer_output = activation(answer_maxpool)
+        subject_output = activation(subject_maxpool)
+        predict_output = activation(predict_maxpool)
+        object_output = activation(object_maxpool)
 
-        return question_output, answer_output
+        return subject_output, predict_output, object_output
 
+
+# unused !!!!!!
 
 class ConvolutionModel(LanguageModel):
     ### Validation loss at Epoch 65: 2.4e-6
