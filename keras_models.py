@@ -16,7 +16,7 @@ from attention_lstm import AttentionLSTM
 class LanguageModel:
     def __init__(self, config):
         self.subject = Input(shape=(config['subject_len'],), dtype='int32', name='subject_base')
-        self.predict = Input(shape=(config['relation_len'],), dtype='int32', name='predict_base')
+        self.relation = Input(shape=(config['relation_len'],), dtype='int32', name='relation_base')
         self.object_good = Input(shape=(config['object_len'],), dtype='int32', name='object_good_base')
         self.object_bad = Input(shape=(config['object_len'],), dtype='int32', name='object_bad_base')
 
@@ -102,31 +102,31 @@ class LanguageModel:
             self._models = self.build()
 
         if self._qa_model is None:
-            subject_output, predict_output, object_output = self._models
+            subject_output, relation_output, object_output = self._models
 
-            sp_output = merge([subject_output, predict_output], mode='sum')
+            sp_output = merge([subject_output, relation_output], mode='sum')
 
             similarity = self.get_similarity()
             qa_model = merge([sp_output, object_output], mode=similarity, output_shape=lambda x: x[:-1])
 
-            self._qa_model = Model(input=[self.subject, self.predict, self.get_object()], output=[qa_model])
+            self._qa_model = Model(input=[self.subject, self.relation, self.get_object()], output=[qa_model])
 
         return self._qa_model
 
     def compile(self, optimizer, **kwargs):
         qa_model = self.get_qa_model()
 
-        good_output = qa_model([self.subject, self.predict, self.object_good])
-        bad_output = qa_model([self.subject, self.predict, self.object_bad])
+        good_output = qa_model([self.subject, self.relation, self.object_good])
+        bad_output = qa_model([self.subject, self.relation, self.object_bad])
 
         loss = merge([good_output, bad_output],
                      mode=lambda x: K.maximum(1e-6, self.config['margin'] - x[0] + x[1]),
                      output_shape=lambda x: x[0])
 
-        self.training_model = Model(input=[self.subject, self.predict, self.object_good, self.object_bad], output=loss)
+        self.training_model = Model(input=[self.subject, self.relation, self.object_good, self.object_bad], output=loss)
         self.training_model.compile(loss=lambda y_true, y_pred: y_pred + y_true - y_true, optimizer=optimizer, **kwargs)
 
-        self.prediction_model = Model(input=[self.subject, self.predict, self.object_good], output=good_output)
+        self.prediction_model = Model(input=[self.subject, self.relation, self.object_good], output=good_output)
         self.prediction_model.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
 
     def fit(self, x, **kwargs):
@@ -149,7 +149,7 @@ class LanguageModel:
 class EmbeddingModel(LanguageModel):
     def build(self):
         subject = self.subject
-        predict = self.predict
+        relation = self.relation
         object_ = self.get_object()
 
         # add embedding layers
@@ -160,28 +160,28 @@ class EmbeddingModel(LanguageModel):
                               weights=weights,
                               mask_zero=True)
         subject_embedding = embedding(subject)
-        predict_embedding = embedding(predict)
+        relation_embedding = embedding(relation)
         object_embedding = embedding(object_)
 
         # dropout
         dropout = Dropout(0.5)
         subject_dropout = dropout(subject_embedding)
-        predict_dropout = dropout(predict_embedding)
+        relation_dropout = dropout(relation_embedding)
         object_dropout = dropout(object_embedding)
 
         # maxpooling
         maxpool = Lambda(lambda x: K.max(x, axis=1, keepdims=False), output_shape=lambda x: (x[0], x[2]))
         subject_maxpool = maxpool(subject_dropout)
-        predict_maxpool = maxpool(predict_dropout)
+        relation_maxpool = maxpool(relation_dropout)
         object_maxpool = maxpool(object_dropout)
 
         # activation
         activation = Activation('tanh')
         subject_output = activation(subject_maxpool)
-        predict_output = activation(predict_maxpool)
+        relation_output = activation(relation_maxpool)
         object_output = activation(object_maxpool)
 
-        return subject_output, predict_output, object_output
+        return subject_output, relation_output, object_output
 
 
 # unused !!!!!!
