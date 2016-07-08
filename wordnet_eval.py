@@ -167,9 +167,8 @@ class Evaluator:
         return self._eval_sets
 
     def get_mrr(self, model, evaluate_all=False):
-        # top1s = list()
-        # mrrs = list()
-
+        top1s = list()
+        mrrs = list()
         for name, data in self.eval_sets().items():
             if evaluate_all:
                 self.print_time()
@@ -182,6 +181,7 @@ class Evaluator:
 
             # c_1 for hit@1, c_3 for hit@3, c_10 for hit@10
             c_1, c_3, c_10 = 0, 0, 0
+            mean_ranks = list()
 
             for i, d in enumerate(data):
                 triplet = d.split('\t')
@@ -197,22 +197,24 @@ class Evaluator:
                 sims = model.predict([subject, relation, objects], batch_size=len(self.entity)).flatten()
                 r = rankdata(sims, method='max')
 
-                max_r = np.argmax(r)
-                # max_n = np.argmax(r[0])
+                target_rank = r[0]
+                num_candidate = len(sims)
+                real_rank = num_candidate - target_rank + 1
 
                 # print(' '.join(self.revert(d['question'])))
                 # print(' '.join(self.revert(self.answers[indices[max_r]])))
                 # print(' '.join(self.revert(self.answers[indices[max_n]])))
 
-                c_1 += 1 if max_r == 0 else 0
-                c_3 += 1 if max_r < 3 else 0
-                c_10 += 1 if max_r < 10 else 0
+                c_1 += 1 if target_rank == num_candidate else 0
+                c_3 += 1 if target_rank + 3 > num_candidate else 0
+                c_10 += 1 if target_rank + 10 > num_candidate else 0
+                mean_ranks.append(real_rank)
                 # c_2 += 1 / float(r[max_r] - r[max_n] + 1)
 
             hit_at_1 = c_1 / float(len(data))
             hit_at_3 = c_3 / float(len(data))
             hit_at_10 = c_10 / float(len(data))
-            # mrr = c_2 / float(len(data))
+            avg_rank = np.mean(mean_ranks)
 
             del data
 
@@ -220,7 +222,7 @@ class Evaluator:
                 print('Hit@1 Precision: %f' % hit_at_1)
                 print('Hit@3 Precision: %f' % hit_at_3)
                 print('Hit@10 Precision: %f' % hit_at_10)
-                # print('MRR: %f' % mrr)
+                print('Mean Rank: %f' % avg_rank)
 
             # top1s.append(top1)
             # mrrs.append(mrr)
@@ -243,8 +245,6 @@ class Evaluator:
 
             if evaluate_all:
                 return self.get_mrr(model, evaluate_all=True)
-
-        return top1s, mrrs
 
 if __name__ == '__main__':
     conf = {
