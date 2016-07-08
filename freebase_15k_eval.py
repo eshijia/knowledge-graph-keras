@@ -256,7 +256,7 @@ if __name__ == '__main__':
         'relation_len': 1,
         'object_len': 1,
         'n_words': 16297, # len(entity+relation) + 1
-        'margin': 0.05,
+        'margin': 0.2,
 
         'training_params': {
             'save_every': 100,
