@@ -257,7 +257,7 @@ if __name__ == '__main__':
         'training_params': {
             'save_every': 100,
             # 'eval_every': 1,
-            'batch_size': 128,
+            'batch_size': 256,
             'nb_epoch': 500,
             'validation_split': 0,
             'optimizer': 'adam',
@@ -271,7 +271,7 @@ if __name__ == '__main__':
         },
 
         'model_params': {
-            'n_embed_dims': 100,
+            'n_embed_dims': 1000,
             'n_hidden': 200,
 
             # convolution
