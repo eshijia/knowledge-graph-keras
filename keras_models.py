@@ -130,10 +130,10 @@ class LanguageModel:
         if self._qa_model_rt is None:
             subject_output, relation_output, object_output = self._models
 
-            po_output = merge([object_output, -relation_output], mode='sum')
+            po_output = merge([object_output, relation_output], mode=lambda x: x[0] - x[1], output_shape=lambda x: x[0])
 
             similarity = self.get_similarity()
-            qa_model_rt = merge([po_output, subject_output], mode=similarity, output_shape=lambda x: x[-1])
+            qa_model_rt = merge([po_output, subject_output], mode=similarity, output_shape=lambda x: x[:-1])
 
             self._qa_model_rt = Model(input=[self.get_subject(), self.relation, self.object_good], output=[qa_model_rt])
 

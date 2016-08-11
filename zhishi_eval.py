@@ -357,9 +357,13 @@ if __name__ == '__main__':
     evaluator = Evaluator(conf)
 
     ##### Define model ######
-    model = EmbeddingModel(conf)
+    # model = EmbeddingModel(conf)
+    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
+    # model.compile(optimizer=optimizer)
+
+    model = EmbeddingModelRt(conf)
     optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
-    model.compile(optimizer=optimizer)
+    model.compile_rt(optimizer=optimizer)
 
     import numpy as np
 
@@ -373,7 +377,8 @@ if __name__ == '__main__':
 
     # train the model
     # evaluator.load_epoch(model, 54)
-    evaluator.train(model)
+    # evaluator.train(model)
+    evaluator.train_rt(model)
 
     # evaluate mrr for a particular epoch
     # evaluator.load_epoch(model, 5)
