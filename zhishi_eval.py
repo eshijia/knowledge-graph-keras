@@ -195,7 +195,7 @@ class Evaluator:
                 self.get_mrr(model)
 
             if save_every is not None and i % save_every == 0:
-                self.save_epoch(model, i)
+                self.save_epoch_rt(model, i)
         print("Training completed!")
 
     ##### Evaluation #####
