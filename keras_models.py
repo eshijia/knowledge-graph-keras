@@ -16,6 +16,7 @@ from attention_lstm import AttentionLSTM
 class LanguageModel:
     def __init__(self, config):
         self.subject = Input(shape=(config['subject_len'],), dtype='int32', name='subject_base')
+        self.subject_bad = Input(shape=(config['subject_len'],), dtype='int32', name='subject_bad_base')
         self.relation = Input(shape=(config['relation_len'],), dtype='int32', name='relation_base')
         self.object_good = Input(shape=(config['object_len'],), dtype='int32', name='object_good_base')
         self.object_bad = Input(shape=(config['object_len'],), dtype='int32', name='object_bad_base')
@@ -28,15 +29,24 @@ class LanguageModel:
         self._models = None
         self._similarities = None
         self._object = None
+        self._subject = None
         self._qa_model = None
+        self._qa_model_rt = None
 
         self.training_model = None
+        self.training_model_rt = None
         self.prediction_model = None
+        self.prediction_model_rt = None
 
     def get_object(self):
         if self._object is None:
             self._object = Input(shape=(self.config['object_len'],), dtype='int32', name='object')
         return self._object
+
+    def get_subject(self):
+        if self._subject is None:
+            self._subject = Input(shape=(self.config['subject_len'],), dtype='int32', name='subject')
+        return self._subject
 
     @abstractmethod
     def build(self):
@@ -113,6 +123,22 @@ class LanguageModel:
 
         return self._qa_model
 
+    def get_qa_model_rt(self):
+        if self._models is None:
+            self._models = self.build()
+
+        if self._qa_model_rt is None:
+            subject_output, relation_output, object_output = self._models
+
+            po_output = merge([object_output, -relation_output], mode='sum')
+
+            similarity = self.get_similarity()
+            qa_model_rt = merge([po_output, subject_output], mode=similarity, output_shape=lambda x: x[-1])
+
+            self._qa_model_rt = Model(input=[self.get_subject(), self.relation, self.object_good], output=[qa_model_rt])
+
+        return self._qa_model_rt
+
     def compile(self, optimizer, **kwargs):
         qa_model = self.get_qa_model()
 
@@ -129,21 +155,63 @@ class LanguageModel:
         self.prediction_model = Model(input=[self.subject, self.relation, self.object_good], output=good_output)
         self.prediction_model.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
 
+    def compile_rt(self, optimizer, **kwargs):
+        qa_model_rt = self.get_qa_model_rt()
+
+        good_output = qa_model_rt([self.subject, self.relation, self.object_good])
+        bad_output = qa_model_rt([self.subject_bad, self.relation, self.object_good])
+
+        loss = merge([good_output, bad_output],
+                     mode=lambda x: K.maximum(1e-6, self.config['margin'] - x[0] + x[1]),
+                     output_shape=lambda x: x[0])
+
+        self.training_model_rt = Model(input=[self.subject, self.subject_bad, self.relation, self.object_good], output=loss)
+        self.training_model_rt.compile(loss=lambda y_true, y_pred: y_pred + y_true - y_true, optimizer=optimizer, **kwargs)
+
+        self.prediction_model_rt = Model(input=[self.subject, self.relation, self.object_good], output=good_output)
+        self.prediction_model_rt.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
+
     def fit(self, x, **kwargs):
         assert self.training_model is not None, 'Must compile the model before fitting data'
         y = np.zeros(shape=x[0].shape[:1])
         return self.training_model.fit(x, y, **kwargs)
 
+    def fit_rt(self, x, **kwargs):
+        assert self.training_model_rt is not None, 'Must compile the model before fitting data'
+        y = np.zeros(shape=x[0].shape[:1])
+        return self.training_model_rt.fit(x, y, **kwargs)
+
+    def train_on_batch(self, x, **kwargs):
+        assert self.training_model is not None, 'Must compile the model before fitting data'
+        y = np.zeros(shape=x[0].shape[:1])
+        return self.training_model.train_on_batch(x, y, **kwargs)
+
+    def train_on_batch_rt(self, x, **kwargs):
+        assert self.training_model_rt is not None, 'Must compile the model before fitting data'
+        y = np.zeros(shape=x[0].shape[:1])
+        return self.training_model_rt.train_on_batch(x, y, **kwargs)
+
     def predict(self, x, **kwargs):
         return self.prediction_model.predict(x, **kwargs)
+
+    def predict_rt(self, x, **kwargs):
+        return self.prediction_model_rt.predict(x, **kwargs)
 
     def save_weights(self, file_name, **kwargs):
         assert self.prediction_model is not None, 'Must compile the model before saving weights'
         self.prediction_model.save_weights(file_name, **kwargs)
 
+    def save_weights_rt(self, file_name, **kwargs):
+        assert self.prediction_model_rt is not None, 'Must compile the model before saving weights'
+        self.prediction_model_rt.save_weights(file_name, **kwargs)
+
     def load_weights(self, file_name, **kwargs):
         assert self.prediction_model is not None, 'Must compile the model loading weights'
         self.prediction_model.load_weights(file_name, **kwargs)
+
+    def load_weights_rt(self, file_name, **kwargs):
+        assert self.prediction_model_rt is not None, 'Must compile the model loading weights'
+        self.prediction_model_rt.load_weights(file_name, **kwargs)
 
 
 class EmbeddingModel(LanguageModel):
@@ -151,6 +219,44 @@ class EmbeddingModel(LanguageModel):
         subject = self.subject
         relation = self.relation
         object_ = self.get_object()
+
+        # add embedding layers
+        weights = self.model_params.get('initial_embed_weights', None)
+        weights = weights if weights is None else [weights]
+        embedding = Embedding(input_dim=self.config['n_words'],
+                              output_dim=self.model_params.get('n_embed_dims', 100),
+                              weights=weights,
+                              mask_zero=True)
+        subject_embedding = embedding(subject)
+        relation_embedding = embedding(relation)
+        object_embedding = embedding(object_)
+
+        # dropout
+        dropout = Dropout(0.5)
+        subject_dropout = dropout(subject_embedding)
+        relation_dropout = dropout(relation_embedding)
+        object_dropout = dropout(object_embedding)
+
+        # maxpooling
+        maxpool = Lambda(lambda x: K.max(x, axis=1, keepdims=False), output_shape=lambda x: (x[0], x[2]))
+        subject_maxpool = maxpool(subject_dropout)
+        relation_maxpool = maxpool(relation_dropout)
+        object_maxpool = maxpool(object_dropout)
+
+        # activation
+        activation = Activation('tanh')
+        subject_output = activation(subject_maxpool)
+        relation_output = activation(relation_maxpool)
+        object_output = activation(object_maxpool)
+
+        return subject_output, relation_output, object_output
+
+
+class EmbeddingModelRt(LanguageModel):
+    def build(self):
+        subject = self.get_subject()
+        relation = self.relation
+        object_ = self.object_good
 
         # add embedding layers
         weights = self.model_params.get('initial_embed_weights', None)
