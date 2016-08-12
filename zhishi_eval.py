@@ -10,6 +10,8 @@ from keras.optimizers import RMSprop, Adam
 from scipy.stats import rankdata
 from keras.utils import generic_utils
 from keras_models import *
+from heapq import nlargest
+import codecs
 
 random.seed(42)
 os.environ['ZHISHI'] = 'data/zhishi'
@@ -213,20 +215,73 @@ class Evaluator:
             self._eval_sets = dict([(s, self.load(s)) for s in ['zhishi_hr-test.pkl']])
         return self._eval_sets
 
+    def eval_sets_rt(self):
+        if self._eval_sets is None:
+            self._eval_sets = dict([(s, self.load(s)) for s in ['zhishi_rt-test.pkl']])
+        return self._eval_sets
+
+    def eval_sets_tc(self):
+        if self._eval_sets is None:
+            self._eval_sets = dict([(s, self.load(s)) for s in ['zhishi_tc-test.pkl']])
+        return self._eval_sets
+
     def make_submit(self, model, submit_file):
-        for name, data in self.eval_sets().items():
+        data = self.eval_sets().values()[0]
+        target_lines = list()
+        for i, d in enumerate(data):
+            num_candidate = len(self.entity)
+            index_entities = xrange(num_candidate)
 
-            for i, d in enumerate(data):
+            terms = d.split('\t')
+            answers = [[idx] for idx in self.entity.keys()]
+            subjects = [[terms[0]]] * num_candidate
+            relations = [[terms[1]]] * num_candidate
 
-                indices = d['answers']
-                answers = self.pada(indices)
-                question = self.padq([d['question']] * len(indices))
+            sims = model.predict([subjects, relations, answers], batch_size=num_candidate).flatten()
+            print(len(sims))
+            r = rankdata(sims, method='ordinal')
+            index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
+            one_line = ' '.join(index_candidates)
+            target_lines.append(one_line + '\n')
+        submit_file.writelines(target_lines)
 
-                sims = model.predict([question, answers], batch_size=50).flatten()
-                print(len(sims))
-                for sim in sims:
-                    line = str(sim) + '\n'
-                    submit_file.write(line)
+    def make_submit_rt(self, model, submit_file):
+        data = self.eval_sets_rt().values()[0]
+        target_lines = list()
+        for i, d in enumerate(data):
+            num_candidate = len(self.entity)
+            index_entities = xrange(num_candidate)
+
+            terms = d.split('\t')
+            answers = [[idx] for idx in self.entity.keys()]
+            relations = [[terms[0]]] * num_candidate
+            objects = [[terms[1]]] * num_candidate
+
+            sims = model.predict_rt([answers, relations, objects], batch_size=num_candidate).flatten()
+            print(len(sims))
+            r = rankdata(sims, method='ordinal')
+            index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
+            one_line = ' '.join(index_candidates)
+            target_lines.append(one_line + '\n')
+        submit_file.writelines(target_lines)
+
+    def make_submit_tc(self, model, submit_file):
+        data = self.eval_sets_tc().values()[0]
+        target_lines = list()
+        for i, d in enumerate(data):
+
+            terms = d.split('\t')
+            subjects = [[terms[0]]]
+            relations = [[terms[1]]]
+            objects = [[terms[2]]]
+
+            sims = model.predict([subjects, relations, objects], batch_size=1).flatten()
+            print(len(sims))
+            if sims[0] >= 0.55:
+                target_lines.append(1)
+            else:
+                target_lines.append(0)
+        submit_file.writelines(' '.join(target_lines))
 
     def get_mrr(self, model, evaluate_all=False):
         top1s = list()
@@ -375,11 +430,24 @@ if __name__ == '__main__':
     # weights = embedding_layer.get_weights()[0]
     # np.save(open('models/embedding_1000_dim.h5', 'wb'), weights)
 
-    # train the model
-    # evaluator.load_epoch(model, 54)
+    # model for link prediction -> tail
+    evaluator.load_epoch(model, 200)
     # evaluator.train(model)
-    evaluator.train_rt(model)
+    lp_t = codecs.open('lp_t.txt', 'wb')
+    evaluator.make_submit(model, lp_t)
+
+    # model for link prediction -> head
+    # evaluator.load_epoch_rt(model, 200)
+    # evaluator.train_rt(model)
+    # lp_h = codecs.open('lp_h.txt', 'wb')
+    # evaluator.make_submit_rt(model, lp_h)
+
+    # model for triplet classification
+    # evaluator.load_epoch(model, 200)
+    # evaluator.train(model)
+    # tc = codecs.open('tc.txt', 'wb')
+    # evaluator.make_submit_tc(model, tc)
 
     # evaluate mrr for a particular epoch
-    # evaluator.load_epoch(model, 5)
+    # evaluator.load_epoch(model, 200)
     # evaluator.get_mrr(model, evaluate_all=True)
