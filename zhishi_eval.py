@@ -58,7 +58,7 @@ class Evaluator:
     def save_epoch_rt(self, model, epoch):
         if not os.path.exists('models/zhishi_models/embedding_rt/'):
             os.makedirs('models/zhishi_models/embedding_rt/')
-        model.save_weights('models/zhishi_models/embedding_rt/weights_epoch_%d.h5' % epoch, overwrite=True)
+        model.save_weights_rt('models/zhishi_models/embedding_rt/weights_epoch_%d.h5' % epoch, overwrite=True)
 
     def load_epoch(self, model, epoch):
         assert os.path.exists('models/zhishi_models/embedding/weights_epoch_%d.h5' % epoch),\
@@ -68,7 +68,7 @@ class Evaluator:
     def load_epoch_rt(self, model, epoch):
         assert os.path.exists('models/zhishi_models/embedding_rt/weights_epoch_%d.h5' % epoch),\
             'Weights at epoch %d not found' % epoch
-        model.load_weights('models/zhishi_models/embedding_rt/weights_epoch_%d.h5' % epoch)
+        model.load_weights_rt('models/zhishi_models/embedding_rt/weights_epoch_%d.h5' % epoch)
 
 
     ##### Converting / reverting #####
