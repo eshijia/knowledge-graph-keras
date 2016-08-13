@@ -228,12 +228,12 @@ class Evaluator:
     def make_submit(self, model, submit_file):
         data = self.eval_sets().values()[0]
         target_lines = list()
+        answers = np.asarray([[idx] for idx in self.entity.keys()])
         for i, d in enumerate(data):
             num_candidate = len(self.entity)
             index_entities = xrange(num_candidate)
 
             terms = d.split('\t')
-            answers = np.asarray([[idx] for idx in self.entity.keys()])
             subjects = np.asarray([[terms[0]]] * num_candidate)
             relations = np.asarray([[terms[1]]] * num_candidate)
 
@@ -248,12 +248,12 @@ class Evaluator:
     def make_submit_rt(self, model, submit_file):
         data = self.eval_sets_rt().values()[0]
         target_lines = list()
+        answers = np.asarray([[idx] for idx in self.entity.keys()])
         for i, d in enumerate(data):
             num_candidate = len(self.entity)
             index_entities = xrange(num_candidate)
 
             terms = d.split('\t')
-            answers = np.asarray([[idx] for idx in self.entity.keys()])
             relations = np.asarray([[terms[0]]] * num_candidate)
             objects = np.asaray([[terms[1]]] * num_candidate)
 
