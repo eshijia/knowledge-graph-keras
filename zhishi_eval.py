@@ -241,7 +241,7 @@ class Evaluator:
             print(len(sims))
             r = rankdata(sims, method='ordinal')
             index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
-            one_line = ' '.join(index_candidates)
+            one_line = ' '.join([str(index_candidate) for index_candidate in index_candidates])
             target_lines.append(one_line + '\n')
         submit_file.writelines(target_lines)
 
@@ -261,7 +261,7 @@ class Evaluator:
             print(len(sims))
             r = rankdata(sims, method='ordinal')
             index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
-            one_line = ' '.join(index_candidates)
+            one_line = ' '.join([str(index_candidate) for index_candidate in index_candidates])
             target_lines.append(one_line + '\n')
         submit_file.writelines(target_lines)
 
@@ -278,9 +278,9 @@ class Evaluator:
             sims = model.predict([subjects, relations, objects], batch_size=1).flatten()
             print(len(sims))
             if sims[0] >= 0.55:
-                target_lines.append(1)
+                target_lines.append('1')
             else:
-                target_lines.append(0)
+                target_lines.append('0')
         submit_file.writelines(' '.join(target_lines))
 
     def get_mrr(self, model, evaluate_all=False):
