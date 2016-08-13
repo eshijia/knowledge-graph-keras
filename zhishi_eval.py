@@ -238,7 +238,7 @@ class Evaluator:
             relations = np.asarray([[terms[1]]] * num_candidate)
 
             sims = model.predict([subjects, relations, answers], batch_size=num_candidate).flatten()
-            print(len(sims))
+            print(i)
             r = rankdata(sims, method='ordinal')
             index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
             one_line = ' '.join([str(index_candidate) for index_candidate in index_candidates])
@@ -258,7 +258,7 @@ class Evaluator:
             objects = np.asaray([[terms[1]]] * num_candidate)
 
             sims = model.predict_rt([answers, relations, objects], batch_size=num_candidate).flatten()
-            print(len(sims))
+            print(i)
             r = rankdata(sims, method='ordinal')
             index_candidates = nlargest(200, index_entities, key=lambda j: r[j])
             one_line = ' '.join([str(index_candidate) for index_candidate in index_candidates])
@@ -276,7 +276,7 @@ class Evaluator:
             objects = np.asarray([[terms[2]]])
 
             sims = model.predict([subjects, relations, objects], batch_size=1).flatten()
-            print(len(sims))
+            print(i)
             if sims[0] >= 0.55:
                 target_lines.append('1')
             else:
