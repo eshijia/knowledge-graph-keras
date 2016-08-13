@@ -255,7 +255,7 @@ class Evaluator:
 
             terms = d.split('\t')
             relations = np.asarray([[terms[0]]] * num_candidate)
-            objects = np.asaray([[terms[1]]] * num_candidate)
+            objects = np.asarray([[terms[1]]] * num_candidate)
 
             sims = model.predict_rt([answers, relations, objects], batch_size=num_candidate).flatten()
             print(i)
@@ -431,16 +431,16 @@ if __name__ == '__main__':
     # np.save(open('models/embedding_1000_dim.h5', 'wb'), weights)
 
     # model for link prediction -> tail
-    evaluator.load_epoch(model, 200)
+    # evaluator.load_epoch(model, 200)
     # evaluator.train(model)
-    lp_t = codecs.open('lp_t.txt', 'wb')
-    evaluator.make_submit(model, lp_t)
+    # lp_t = codecs.open('lp_t.txt', 'wb')
+    # evaluator.make_submit(model, lp_t)
 
     # model for link prediction -> head
-    # evaluator.load_epoch_rt(model, 200)
+    evaluator.load_epoch_rt(model, 100)
     # evaluator.train_rt(model)
-    # lp_h = codecs.open('lp_h.txt', 'wb')
-    # evaluator.make_submit_rt(model, lp_h)
+    lp_h = codecs.open('lp_h.txt', 'wb')
+    evaluator.make_submit_rt(model, lp_h)
 
     # model for triplet classification
     # evaluator.load_epoch(model, 200)
