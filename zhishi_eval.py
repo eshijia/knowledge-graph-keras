@@ -233,9 +233,9 @@ class Evaluator:
             index_entities = xrange(num_candidate)
 
             terms = d.split('\t')
-            answers = [[idx] for idx in self.entity.keys()]
-            subjects = [[terms[0]]] * num_candidate
-            relations = [[terms[1]]] * num_candidate
+            answers = np.asarray([[idx] for idx in self.entity.keys()])
+            subjects = np.asarray([[terms[0]]] * num_candidate)
+            relations = np.asarray([[terms[1]]] * num_candidate)
 
             sims = model.predict([subjects, relations, answers], batch_size=num_candidate).flatten()
             print(len(sims))
@@ -253,9 +253,9 @@ class Evaluator:
             index_entities = xrange(num_candidate)
 
             terms = d.split('\t')
-            answers = [[idx] for idx in self.entity.keys()]
-            relations = [[terms[0]]] * num_candidate
-            objects = [[terms[1]]] * num_candidate
+            answers = np.asarray([[idx] for idx in self.entity.keys()])
+            relations = np.asarray([[terms[0]]] * num_candidate)
+            objects = np.asaray([[terms[1]]] * num_candidate)
 
             sims = model.predict_rt([answers, relations, objects], batch_size=num_candidate).flatten()
             print(len(sims))
@@ -271,9 +271,9 @@ class Evaluator:
         for i, d in enumerate(data):
 
             terms = d.split('\t')
-            subjects = [[terms[0]]]
-            relations = [[terms[1]]]
-            objects = [[terms[2]]]
+            subjects = np.asarray([[terms[0]]])
+            relations = np.asarray([[terms[1]]])
+            objects = np.asarray([[terms[2]]])
 
             sims = model.predict([subjects, relations, objects], batch_size=1).flatten()
             print(len(sims))
@@ -412,13 +412,13 @@ if __name__ == '__main__':
     evaluator = Evaluator(conf)
 
     ##### Define model ######
-    # model = EmbeddingModel(conf)
-    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
-    # model.compile(optimizer=optimizer)
-
-    model = EmbeddingModelRt(conf)
+    model = EmbeddingModel(conf)
     optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
-    model.compile_rt(optimizer=optimizer)
+    model.compile(optimizer=optimizer)
+
+    # model = EmbeddingModelRt(conf)
+    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
+    # model.compile_rt(optimizer=optimizer)
 
     import numpy as np
 
