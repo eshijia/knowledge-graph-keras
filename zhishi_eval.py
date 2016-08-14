@@ -225,6 +225,19 @@ class Evaluator:
             self._eval_sets = dict([(s, self.load(s)) for s in ['zhishi_tc-test.pkl']])
         return self._eval_sets
 
+    def make_submit_rt_test(self, model, submit_file):
+        data = self.eval_sets_rt().values()[0]
+        target_lines = list()
+        num_candidate = len(self.entity)
+        answers = np.asarray([[idx] for idx in self.entity.keys()] * len(data))
+        objects = np.asarray([[line.split('\t')[1]] * num_candidate for line in data])
+        relations = np.asarray([[line.split('\t')[0]] * num_candidate for line in data])
+        sims = model.predict_rt([answers, relations, objects], batch_size=num_candidate).flatten()
+        print(len(sims))
+        for sim in sims:
+            target_lines.append(str(sim) + '\n')
+        submit_file.writelines(target_lines)
+
     def make_submit(self, model, submit_file):
         data = self.eval_sets().values()[0]
         target_lines = list()
