@@ -4,7 +4,8 @@ from abc import abstractmethod
 
 from keras.engine import Input
 from keras.layers import merge, Embedding, Dropout, Convolution1D, Lambda, Activation, LSTM, Dense, TimeDistributed, \
-    ActivityRegularization
+    ActivityRegularization, Reshape, Flatten
+from keras.constraints import unitnorm
 from keras import backend as K
 from keras.models import Model
 
@@ -83,6 +84,7 @@ class LanguageModel:
         axis = lambda a: len(a._keras_shape) - 1
         dot = lambda a, b: K.batch_dot(a, b, axes=axis(a))
         l2_norm = lambda a, b: K.sqrt(K.sum((a - b) ** 2, axis=axis(a), keepdims=True))
+        l1_norm = lambda a, b: K.sum(K.abs(a - b), axis=axis(a), keepdims=True)
 
         if similarity == 'cosine':
             return lambda x: dot(x[0], x[1]) / K.sqrt(dot(x[0], x[0]) * dot(x[1], x[1]))
@@ -94,6 +96,8 @@ class LanguageModel:
             return lambda x: K.exp(-1 * params['gamma'] * l2_norm(x[0], x[1]) ** 2)
         elif similarity == 'euclidean':
             return lambda x: 1 / (1 + l2_norm(x[0], x[1]))
+        elif similarity == 'l1':
+            return lambda x: l1_norm(x[0], x[1])
         elif similarity == 'exponential':
             return lambda x: K.exp(-1 * params['gamma'] * l2_norm(x[0], x[1]))
         elif similarity == 'gesd':
@@ -113,7 +117,6 @@ class LanguageModel:
 
         if self._qa_model is None:
             subject_output, relation_output, object_output = self._models
-
             sp_output = merge([subject_output, relation_output], mode='sum')
 
             similarity = self.get_similarity()
@@ -154,6 +157,7 @@ class LanguageModel:
 
         self.prediction_model = Model(input=[self.subject, self.relation, self.object_good], output=good_output)
         self.prediction_model.compile(loss='binary_crossentropy', optimizer=optimizer, **kwargs)
+        self.training_model.summary()
 
     def compile_rt(self, optimizer, **kwargs):
         qa_model_rt = self.get_qa_model_rt()
@@ -248,6 +252,34 @@ class EmbeddingModel(LanguageModel):
         subject_output = activation(subject_maxpool)
         relation_output = activation(relation_maxpool)
         object_output = activation(object_maxpool)
+
+        return subject_output, relation_output, object_output
+
+
+class TranEModel(LanguageModel):
+    def build(self):
+        subject = self.subject
+        relation = self.relation
+        object_ = self.get_object()
+        embedding_size = self.model_params.get('n_embed_dims', 100)
+
+        # add embedding layers
+        embedding_rel = Embedding(input_dim=self.config['n_words'],
+                                  output_dim=self.model_params.get('n_embed_dims', 100),
+                                  init='he_uniform',
+                                  mask_zero=False)
+        embedding_ent = Embedding(input_dim=self.config['n_words'],
+                                  output_dim=self.model_params.get('n_embed_dims', 100),
+                                  init='he_uniform',
+                                  W_constraint=unitnorm(),
+                                  mask_zero=False)
+        subject_embedding = embedding_ent(subject)
+        relation_embedding = embedding_rel(relation)
+        object_embedding = embedding_ent(object_)
+
+        subject_output = Reshape((embedding_size,))(subject_embedding)
+        relation_output = Reshape((embedding_size,))(relation_embedding)
+        object_output = Reshape((embedding_size,))(object_embedding)
 
         return subject_output, relation_output, object_output
 

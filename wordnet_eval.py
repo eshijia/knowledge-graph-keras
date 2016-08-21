@@ -6,7 +6,7 @@ import sys
 import random
 from time import strftime, gmtime
 import cPickle as pickle
-from keras.optimizers import RMSprop, Adam
+from keras.optimizers import RMSprop, Adam, SGD
 from scipy.stats import rankdata
 from keras_models import *
 
@@ -251,16 +251,16 @@ if __name__ == '__main__':
         'subject_len': 1,
         'relation_len': 1,
         'object_len': 1,
-        'n_words': 40962, # len(vocabulary) + 1
-        'margin': 0.2,
+        'n_words': 40962,  # len(vocabulary) + 1
+        'margin': 2,
 
         'training_params': {
             'save_every': 100,
             # 'eval_every': 1,
-            'batch_size': 256,
-            'nb_epoch': 500,
+            'batch_size': 128,
+            'nb_epoch': 1000,
             'validation_split': 0,
-            'optimizer': 'adam',
+            'optimizer': SGD(lr=0.01),
             # 'optimizer': Adam(clip_norm=0.1),
             # 'n_eval': 100,
 
@@ -271,7 +271,7 @@ if __name__ == '__main__':
         },
 
         'model_params': {
-            'n_embed_dims': 1000,
+            'n_embed_dims': 20,
             'n_hidden': 200,
 
             # convolution
@@ -285,7 +285,7 @@ if __name__ == '__main__':
         },
 
         'similarity_params': {
-            'mode': 'cosine',
+            'mode': 'l1',
             'gamma': 1,
             'c': 1,
             'd': 2,
@@ -294,12 +294,15 @@ if __name__ == '__main__':
 
     evaluator = Evaluator(conf)
 
-    ##### Define model ######
-    model = EmbeddingModel(conf)
-    optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
-    model.compile(optimizer=optimizer)
+    ##### Embedding model ######
+    # model = EmbeddingModel(conf)
+    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
 
-    import numpy as np
+    # TransE model
+    model = TranEModel(conf)
+    optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
+
+    model.compile(optimizer=optimizer)
 
     # save embedding layer
     # evaluator.load_epoch(model, 33)
