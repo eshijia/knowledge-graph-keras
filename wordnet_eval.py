@@ -6,7 +6,7 @@ import sys
 import random
 from time import strftime, gmtime
 import cPickle as pickle
-from keras.optimizers import RMSprop, Adam, SGD
+from keras.optimizers import RMSprop, Adam, SGD, Adadelta
 from scipy.stats import rankdata
 from keras_models import *
 
@@ -109,6 +109,9 @@ class Evaluator:
         subjects = np.asarray(subjects)
         relations = np.asarray(relations)
         good_objects = np.asarray(good_objects)
+        num_bad = len(good_objects)
+        bad_object_candidates = [[int(key)] for key in self.entity.keys()] * 4
+        random.shuffle(bad_object_candidates)
 
         # subjects_valid = list()
         # relations_valid = list()
@@ -130,9 +133,9 @@ class Evaluator:
             # bad_answers = np.roll(good_answers, random.randint(10, len(questions) - 10))
             # bad_answers = good_answers.copy()
             # random.shuffle(bad_answers)
-            bad_objects = np.asarray([[int(random.choice(self.entity.keys()))] for _ in xrange(len(good_objects))])
+            bad_objects = np.asarray(random.sample(bad_object_candidates, num_bad))
 
-            # shuffle questionsj
+            # shuffle question
             # zipped = zip(questions, good_answers)
             # random.shuffle(zipped)
             # questions[:], good_answers[:] = zip(*zipped)
@@ -251,7 +254,7 @@ if __name__ == '__main__':
         'subject_len': 1,
         'relation_len': 1,
         'object_len': 1,
-        'n_words': 40962,  # len(vocabulary) + 1
+        'n_words': 40961,  # len(vocabulary)
         'margin': 2,
 
         'training_params': {
@@ -260,7 +263,7 @@ if __name__ == '__main__':
             'batch_size': 128,
             'nb_epoch': 1000,
             'validation_split': 0,
-            'optimizer': SGD(lr=0.01),
+            'optimizer': Adam(),
             # 'optimizer': Adam(clip_norm=0.1),
             # 'n_eval': 100,
 
@@ -315,6 +318,9 @@ if __name__ == '__main__':
     # train the model
     # evaluator.load_epoch(model, 54)
     evaluator.train(model)
+    # embedding_matrix = model.prediction_model.layers[3].layers[3].get_weights()[0]
+    # print(np.linalg.norm(embedding_matrix[1, :]))
+    # print(np.linalg.norm(embedding_matrix[:, 1]))
 
     # evaluate mrr for a particular epoch
     # evaluator.load_epoch(model, 5)

@@ -97,7 +97,7 @@ class LanguageModel:
         elif similarity == 'euclidean':
             return lambda x: 1 / (1 + l2_norm(x[0], x[1]))
         elif similarity == 'l1':
-            return lambda x: l1_norm(x[0], x[1])
+            return lambda x: -l1_norm(x[0], x[1])
         elif similarity == 'exponential':
             return lambda x: K.exp(-1 * params['gamma'] * l2_norm(x[0], x[1]))
         elif similarity == 'gesd':
@@ -271,7 +271,7 @@ class TranEModel(LanguageModel):
         embedding_ent = Embedding(input_dim=self.config['n_words'],
                                   output_dim=self.model_params.get('n_embed_dims', 100),
                                   init='he_uniform',
-                                  W_constraint=unitnorm(),
+                                  W_constraint=unitnorm(axis=1),
                                   mask_zero=False)
         subject_embedding = embedding_ent(subject)
         relation_embedding = embedding_rel(relation)
