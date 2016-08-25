@@ -256,6 +256,44 @@ class EmbeddingModel(LanguageModel):
         return subject_output, relation_output, object_output
 
 
+class CNNLevelModel(LanguageModel):
+    def build(self):
+        subject = self.subject
+        relation = self.relation
+        object_ = self.get_object()
+
+        # add embedding layers
+        weights = self.model_params.get('initial_embed_weights', None)
+        weights = weights if weights is None else [weights]
+        embedding = Embedding(input_dim=self.config['n_words'],
+                              output_dim=self.model_params.get('n_embed_dims', 100),
+                              weights=weights,
+                              mask_zero=True)
+        subject_embedding = embedding(subject)
+        relation_embedding = embedding(relation)
+        object_embedding = embedding(object_)
+
+        # dropout
+        dropout = Dropout(0.5)
+        subject_dropout = dropout(subject_embedding)
+        relation_dropout = dropout(relation_embedding)
+        object_dropout = dropout(object_embedding)
+
+        # maxpooling
+        maxpool = Lambda(lambda x: K.max(x, axis=1, keepdims=False), output_shape=lambda x: (x[0], x[2]))
+        subject_maxpool = maxpool(subject_dropout)
+        relation_maxpool = maxpool(relation_dropout)
+        object_maxpool = maxpool(object_dropout)
+
+        # activation
+        activation = Activation('tanh')
+        subject_output = activation(subject_maxpool)
+        relation_output = activation(relation_maxpool)
+        object_output = activation(object_maxpool)
+
+        return subject_output, relation_output, object_output
+
+
 class TranEModel(LanguageModel):
     def build(self):
         subject = self.subject

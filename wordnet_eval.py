@@ -6,7 +6,7 @@ import sys
 import random
 from time import strftime, gmtime
 import cPickle as pickle
-from keras.optimizers import RMSprop, Adam, SGD, Adadelta
+from keras.optimizers import RMSprop, Adam, SGD, Adadelta, Adagrad
 from scipy.stats import rankdata
 from keras_models import *
 
@@ -182,8 +182,8 @@ class Evaluator:
             if not evaluate_all and 'n_eval' in self.params:
                 data = data[:self.params['n_eval']]
 
-            # c_1 for hit@1, c_3 for hit@3, c_10 for hit@10
-            c_1, c_3, c_10 = 0, 0, 0
+            # c_1 for hit@1, c_3 for hit@3, c_10 for hit@10, rr for mrr
+            c_1, c_3, c_10, rr = 0, 0, 0, 0
             mean_ranks = list()
 
             for i, d in enumerate(data):
@@ -212,12 +212,13 @@ class Evaluator:
                 c_3 += 1 if target_rank + 3 > num_candidate else 0
                 c_10 += 1 if target_rank + 10 > num_candidate else 0
                 mean_ranks.append(real_rank)
-                # c_2 += 1 / float(r[max_r] - r[max_n] + 1)
+                rr += 1 / float(target_rank + 1)
 
             hit_at_1 = c_1 / float(len(data))
             hit_at_3 = c_3 / float(len(data))
             hit_at_10 = c_10 / float(len(data))
             avg_rank = np.mean(mean_ranks)
+            mrr = rr / float(len(data))
 
             del data
 
@@ -226,6 +227,7 @@ class Evaluator:
                 print('Hit@3 Precision: %f' % hit_at_3)
                 print('Hit@10 Precision: %f' % hit_at_10)
                 print('Mean Rank: %f' % avg_rank)
+                print('MRR: %f' % mrr)
 
             # top1s.append(top1)
             # mrrs.append(mrr)
@@ -255,7 +257,7 @@ if __name__ == '__main__':
         'relation_len': 1,
         'object_len': 1,
         'n_words': 40961,  # len(vocabulary)
-        'margin': 2,
+        'margin': 0.2,
 
         'training_params': {
             'save_every': 100,
@@ -274,7 +276,7 @@ if __name__ == '__main__':
         },
 
         'model_params': {
-            'n_embed_dims': 20,
+            'n_embed_dims': 1000,
             'n_hidden': 200,
 
             # convolution
@@ -284,11 +286,11 @@ if __name__ == '__main__':
             # recurrent
             'n_lstm_dims': 141, # * 2
 
-            # 'initial_embed_weights': np.load('word2vec_100_dim.embeddings'),
+            'initial_embed_weights': np.load('models/wordnet_word2vec_1000_dim.h5'),
         },
 
         'similarity_params': {
-            'mode': 'l1',
+            'mode': 'cosine',
             'gamma': 1,
             'c': 1,
             'd': 2,
@@ -298,12 +300,12 @@ if __name__ == '__main__':
     evaluator = Evaluator(conf)
 
     ##### Embedding model ######
-    # model = EmbeddingModel(conf)
-    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
+    model = EmbeddingModel(conf)
+    optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
 
     # TransE model
-    model = TranEModel(conf)
-    optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
+    # model = TranEModel(conf)
+    # optimizer = conf.get('training_params', dict()).get('optimizer', 'adam')
 
     model.compile(optimizer=optimizer)
 
